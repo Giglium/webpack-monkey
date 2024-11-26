@@ -95,6 +95,7 @@ export interface MonkeyPluginOptions {
     resolve?: string | string[] | MetaResolver
     load?: MetaLoader
     transform?: metaTransformer
+    generate?: boolean
   }
   devScript?: {
     meta?:
@@ -613,9 +614,11 @@ export class MonkeyPlugin {
                       })
 
                       // Generate meta file for userscript (*.meta.js)
-                      const metaFile = jsFile.replace("user", "meta")
+                      if(this.options.meta?.generate ?? true) {            
+                      const metaFile = jsFile.replace(/\.user\.js$/, ".meta.js")
                       compilation.emitAsset(metaFile, new RawSource(metaBlock))
                       chunk.auxiliaryFiles.add(metaFile)
+                      }
 
                       // Generate userscript file (*.user.js)
                       jsContent = metaBlock + "\n\n" + jsContent
