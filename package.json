@@ -18,12 +18,13 @@
     "test:tm": "cross-env EXT=tampermonkey playwright test",
     "test:vm": "cross-env EXT=violentmonkey playwright test",
     "test:tm:d": "npm run test:tm -- --debug --headed",
-    "test:tm:ui": "npm run test:tm -- --ui --headed"
+    "test:tm:ui": "npm run test:tm -- --ui --headed",
+    "prepare": "npm run build"
   },
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
+  "main": "dist/lib/index.js",
+  "types": "dist/lib/index.d.ts",
   "files": [
-    "lib",
+    "dist",
     "README.md"
   ],
   "repository": {
