@@ -80,7 +80,7 @@ export function monkey({
 
       optimization: {
         runtimeChunk: {
-          name: () => plugin.getRuntimeName(),
+          name: () => plugin.getRuntimeName()!,
         },
         minimizer: [new MonkeyMinimizer(options)],
 

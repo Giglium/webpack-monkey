@@ -50,6 +50,12 @@ npm install webpack-monkey
 npm install webpack webpack-dev-server
 ```
 
+To install the latest development version directly from GitHub:
+
+```sh
+npm install github:<user>/webpack-monkey
+```
+
 ## Quick start
 
 Here is a preview of the final file structure:
@@ -674,7 +680,30 @@ async function main() {
 
 ## CSS
 
-You can import CSS files in your js files (check out [webpack's guide](https://webpack.js.org/guides/asset-management/#loading-css)), and webpack-monkey will bundle them into the userscript:
+You can import CSS files in your js files (check out [webpack's guide](https://webpack.js.org/guides/asset-management/#loading-css)), and webpack-monkey will bundle them into the userscript.
+
+### With mini-css-extract-plugin (recommended)
+
+This approach extracts CSS into a clean `GM_addStyle()` call at the end of the userscript — no runtime overhead:
+
+**webpack.config.js**
+
+```js
+const MiniCssExtractPlugin = require("mini-css-extract-plugin")
+
+module.exports = monkey({
+  // ...
+  plugins: [new MiniCssExtractPlugin()],
+  module: {
+    rules: [
+      {
+        test: /\.css$/i,
+        use: [MiniCssExtractPlugin.loader, "css-loader"],
+      },
+    ],
+  },
+})
+```
 
 **index.js**
 
@@ -716,7 +745,48 @@ body {
 
 The CSS content will be wrapped in a `GM_addStyle()` at the end of the userscript, so if you or your users are inspecting the code, you can see the JavaScript code from the beginning, without having to scroll over a massive CSS block.
 
-Bonus: when writing styles for your custom DOM elements, a good practice is to use [CSS Modules](https://github.com/css-modules/css-modules), which ensures that your class names will not conflict with other userscripts or the page itself. Check out [webpack's guide](https://webpack.js.org/loaders/css-loader/#modules).
+### With style-loader
+
+You can also use `style-loader`, which injects styles via JavaScript at runtime:
+
+```js
+module.exports = monkey({
+  // ...
+  module: {
+    rules: [
+      {
+        test: /\.css$/i,
+        use: ["style-loader", "css-loader"],
+      },
+    ],
+  },
+})
+```
+
+This works in both development and production. The plugin automatically patches style-loader to use `GM_addStyle` under the hood, so styles are injected correctly in the userscript sandbox.
+
+> [!NOTE]
+> `mini-css-extract-plugin` produces cleaner output (just a `GM_addStyle` call), while `style-loader` bundles the entire style-loader runtime into your userscript. Prefer `mini-css-extract-plugin` unless you have a specific reason to use `style-loader`.
+
+### CSS Modules
+
+When writing styles for your custom DOM elements, a good practice is to use [CSS Modules](https://github.com/css-modules/css-modules), which ensures that your class names will not conflict with other userscripts or the page itself. Check out [webpack's guide](https://webpack.js.org/loaders/css-loader/#modules).
+
+> [!IMPORTANT]
+> If you're using `css-loader` v7+, set `modules.namedExport: false` in your css-loader options. Without this, webpack cannot properly inline the CSS module exports, resulting in bloated output with `__webpack_require__` runtime code left in your userscript.
+
+```js
+{
+  loader: "css-loader",
+  options: {
+    modules: {
+      auto: true,
+      namedExport: false,
+      localIdentName: "[name]__[local]--[hash:base64:4]",
+    },
+  },
+}
+```
 
 ## TypeScript
 
@@ -760,7 +830,6 @@ However, since this TypeScript file will be loaded with `require()`, you'll need
    ```
 
 3. Do either of the following:
-
    - Rename `webpack.config.js` to `webpack.config.ts` (maybe need some rewriting), then webpack will do the rest for you.
    - Install `cross-env`. Then in your `package.json`, prepend a [node flag](https://typestrong.org/ts-node/docs/usage/#node-flags-and-other-tools) to the webpack commands:
 

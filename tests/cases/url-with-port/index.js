@@ -1,1 +1,0 @@
-const div = GM_addElement(document.body, "div", { class: "index1" })

@@ -596,7 +596,12 @@ export class MonkeyPlugin {
                         }
 
                         if (concatenatedCss) {
-                          jsContent += "\nGM_addStyle(`\n" + concatenatedCss + "`)\n"
+                          // Escape backticks and ${ to prevent breaking the template literal
+                          const escapedCss = concatenatedCss
+                            .replace(/\\/g, "\\\\")
+                            .replace(/`/g, "\\`")
+                            .replace(/\$\{/g, "\\${")
+                          jsContent += "\nGM_addStyle(`\n" + escapedCss + "`)\n"
                         }
                       }
 
@@ -715,10 +720,12 @@ export class MonkeyPlugin {
             try {
               const entryPath = require.resolve(userRequest)
               const segments = pathSplit(entryPath)
-              const packageJsonPath = path.join(
-                ...segments.slice(0, segments.indexOf("node_modules") + 2),
-                "package.json",
-              )
+              const packageJsonPath =
+                path.sep +
+                path.join(
+                  ...segments.slice(0, segments.indexOf("node_modules") + 2),
+                  "package.json",
+                )
               packageVersion = require(packageJsonPath).version
             } catch (e) {
               this.logger.warn(`could not find installed package "${userRequest}":`, e)
@@ -833,7 +840,7 @@ export class MonkeyPlugin {
       return resolveAndConvert(value)
     }
     if (isArray(value)) {
-      return [resolveAndConvert(value[0]), ...value.slice(1)]
+      return [resolveAndConvert(value[0]!), ...value.slice(1)]
     }
     return value
   }

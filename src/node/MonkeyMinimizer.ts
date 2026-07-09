@@ -1,5 +1,6 @@
 import { identity } from "lodash"
 import TerserPlugin from "terser-webpack-plugin"
+import type { MinifyOptions } from "terser"
 import { Compiler } from "webpack"
 import { isPatched, markAsPatched } from "../shared/patching"
 import { parentUntil } from "../shared/utils"
@@ -22,10 +23,20 @@ export class MonkeyMinimizer extends TerserPlugin {
   prettierConfig?: object
 
   constructor(options: MonkeyMinimizerOptions = {}) {
+    const terserPluginOptions = options.terserPluginOptions ?? {}
+    const terserOptions: MinifyOptions = (terserPluginOptions as any)?.terserOptions ?? {}
+
     super({
-      ...options.terserPluginOptions,
+      ...terserPluginOptions,
       parallel: false, // TODO: figure out why I set this to false in the past
-      minify: async (file, ...rest) => {
+      // Exclude .meta.js files from minification
+      exclude: /\.meta\.js$/,
+      minify: async (
+        file: TerserPlugin.Input,
+        sourceMap: TerserPlugin.RawSourceMap | undefined,
+        minifyOptions: any,
+        extractComments: TerserPlugin.ExtractCommentsOptions | undefined,
+      ) => {
         file = { ...file }
 
         for (const id in file) {
@@ -42,19 +53,31 @@ export class MonkeyMinimizer extends TerserPlugin {
 
         // run a dummy minify to allow `terserOptions.format.comments`
         // to patch the internal methods before running the real minify
-        await TerserPlugin.terserMinify({ "dummy.js": "// dummy" }, ...rest)
+        await TerserPlugin.terserMinify(
+          { "dummy.js": "// dummy" },
+          sourceMap,
+          minifyOptions,
+          extractComments,
+        )
 
-        const result = await TerserPlugin.terserMinify(file, ...rest)
+        const result = await TerserPlugin.terserMinify(
+          file,
+          sourceMap,
+          minifyOptions,
+          extractComments,
+        )
 
         // restore empty lines from placeholders set by BabelPlugin
-        result.code = result.code.replace(/\/\*EMPTY_LINE\*\//g, "\n\n")
+        if (result.code) {
+          result.code = result.code.replace(/\/\*EMPTY_LINE\*\//g, "\n\n")
 
-        result.code = await this.beautify(result.code)
+          result.code = await this.beautify(result.code)
+        }
 
         return result
       },
       terserOptions: {
-        ...options.terserPluginOptions?.terserOptions,
+        ...terserOptions,
         compress: {
           defaults: false,
           dead_code: true,
@@ -62,12 +85,14 @@ export class MonkeyMinimizer extends TerserPlugin {
           side_effects: true,
           passes: 2,
           conditionals: true,
-          ...(options.terserPluginOptions?.terserOptions as any)?.compress,
+          ...(terserOptions?.compress as object),
         },
         mangle: false,
         format: {
-          ...(options.terserPluginOptions?.terserOptions as any)?.format,
-          comments: (node, comment) => {
+          ...(terserOptions?.format as object),
+          // strip all comments. The userscript meta block (// ==UserScript== ...)
+          // is prepended AFTER minification by MonkeyPlugin, so it's not affected.
+          comments: (node: any, _comment: any) => {
             try {
               this.patchOutputStream(node)
             } catch (e) {
@@ -78,7 +103,7 @@ export class MonkeyMinimizer extends TerserPlugin {
           },
         },
       },
-    })
+    } as any)
 
     this.mkOptions = options
   }
@@ -119,7 +144,6 @@ export class MonkeyMinimizer extends TerserPlugin {
           } else if (!isPatched(output)) {
             markAsPatched(output)
 
-            self.removeRedundantComments(output)
             self.preserveLineBreakInTemplateString(output)
           }
 
@@ -127,17 +151,6 @@ export class MonkeyMinimizer extends TerserPlugin {
         }
       }
     }
-  }
-
-  removeRedundantComments(output: any) {
-    if (!output.append_comments) {
-      this.logger.warn(
-        'could not get Terser to remove redundant comments, because "output.append_comments" is undefined.',
-      )
-      return
-    }
-
-    output.append_comments = () => {}
   }
 
   /**

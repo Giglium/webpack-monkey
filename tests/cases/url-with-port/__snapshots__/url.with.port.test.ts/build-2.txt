@@ -1,6 +1,0 @@
-// ==UserScript==
-// @name     Url with port
-// @grant    GM_addElement
-// @include  *://localhost/
-// @version  1.0.0
-// ==/UserScript==
