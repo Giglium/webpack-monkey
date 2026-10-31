@@ -602,7 +602,12 @@ export class MonkeyPlugin {
                         }
 
                         if (concatenatedCss) {
-                          jsContent += "\nGM_addStyle(`\n" + concatenatedCss + "`)\n"
+                          // Escape backticks and ${ to prevent breaking the template literal
+                          const escapedCss = concatenatedCss
+                            .replace(/\\/g, "\\\\")
+                            .replace(/`/g, "\\`")
+                            .replace(/\$\{/g, "\\${")
+                          jsContent += "\nGM_addStyle(`\n" + escapedCss + "`)\n"
                         }
                       }
 
